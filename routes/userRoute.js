@@ -46,6 +46,7 @@ const {
   registerValidator,
   sendMailVerificationValidator,
   passwordResetValidator,
+  loginValidator,
 } = require("../helpers/validation");
 
 router.post(
@@ -66,5 +67,7 @@ router.post(
   passwordResetValidator,
   userController.forgetPassword,
 );
+
+router.post("/login", loginValidator, userController.loginUser);
 
 module.exports = router;

@@ -4,6 +4,7 @@ const { validationResult } = require("express-validator");
 const mailer = require("../helpers/mailer");
 const randomstring = require("randomstring");
 const PasswordReset = require("../models/passwordReset");
+const jwt = require("jsonwebtoken");
 
 const userRegister = async (req, res) => {
   try {
@@ -227,28 +228,41 @@ const updatePassword = async (req, res) => {
   try {
     const { user_id, password, confirm_password } = req.body;
 
+    // Vérifier si le token de réinitialisation existe
     const resetData = await PasswordReset.findOne({ user_id });
 
-    if (password != confirm_password) {
+    if (!resetData) {
+      return res.render("reset-password", {
+        resetData: null,
+        error: "Invalid or expired reset token",
+      });
+    }
+
+    // Vérifier si les mots de passe correspondent
+    if (password !== confirm_password) {
       return res.render("reset-password", {
         resetData,
         error: "Passwords do not match",
       });
     }
 
-    const hashedPassword = await bcrypt.hash(confirm_password, 12);
+    // Hacher le nouveau mot de passe
+    const hashedPassword = await bcrypt.hash(password, 12);
 
-    User.findOneAndUpdate(
+    // Mettre à jour le mot de passe de l'utilisateur
+    await User.findOneAndUpdate(
       { _id: user_id },
-      {
-        $set: { password: hashedPassword },
-      },
+      { $set: { password: hashedPassword } },
+      { new: true }, // Assure que la mise à jour est prise en compte
     );
 
+    // Supprimer toutes les entrées de réinitialisation du mot de passe pour cet utilisateur
     await PasswordReset.deleteMany({ user_id });
 
+    // Rediriger vers la page de succès
     return res.redirect("/reset-success");
   } catch (e) {
+    console.error("Error updating password:", e);
     return res.render("404");
   }
 };
@@ -261,6 +275,76 @@ const resetSuccess = async (req, res) => {
   }
 };
 
+const generateAccessToken = async (user) => {
+  const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+    expiresIn: "24h",
+  });
+  return token;
+};
+
+const loginUser = async (req, res) => {
+  try {
+    // Vérification des erreurs de validation
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: "Validation errors",
+        errors: errors.array(),
+      });
+    }
+
+    const { email, password } = req.body;
+
+    // Vérifier si l'utilisateur existe
+    const userData = await User.findOne({ email });
+    if (!userData) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid email or password",
+      });
+    }
+
+    // Vérifier si le mot de passe correspond
+    const passwordMatch = await bcrypt.compare(password, userData.password);
+    if (!passwordMatch) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid email or password",
+      });
+    }
+
+    // Vérifier si le compte est vérifié
+    if (userData.is_verified === 0) {
+      return res.status(401).json({
+        success: false,
+        message: "Please verify your account before logging in.",
+      });
+    }
+
+    // Générer le token JWT
+    const accessToken = await generateAccessToken({ userId: userData._id });
+
+    return res.status(200).json({
+      success: true,
+      message: "Logged in successfully",
+      user: {
+        id: userData._id,
+        name: userData.name,
+        email: userData.email,
+      },
+      accessToken,
+      tokenType: "Bearer",
+    });
+  } catch (error) {
+    console.error("Login error:", error); // Debugging
+    return res.status(500).json({
+      success: false,
+      message: "Something went wrong. Please try again later.",
+    });
+  }
+};
+
 module.exports = {
   userRegister,
   mailVerification,
@@ -269,4 +353,5 @@ module.exports = {
   resetPassword,
   updatePassword,
   resetSuccess,
+  loginUser,
 };
