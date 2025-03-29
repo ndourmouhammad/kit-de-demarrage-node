@@ -47,6 +47,7 @@ const {
   sendMailVerificationValidator,
   passwordResetValidator,
   loginValidator,
+  updateProfileValidator,
 } = require("../helpers/validation");
 const auth = require("../middleware/auth");
 
@@ -73,5 +74,12 @@ router.post("/login", loginValidator, userController.loginUser);
 
 // authenticated routes
 router.get("/profile", auth, userController.userProfile);
+router.post(
+  "/update-profile",
+  auth,
+  upload.single("image"),
+  updateProfileValidator,
+  userController.updateProfile,
+);
 
 module.exports = router;

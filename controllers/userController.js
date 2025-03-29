@@ -369,6 +369,48 @@ const userProfile = async (req, res) => {
   }
 };
 
+const updateProfile = async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: "Validation errors",
+        errors: errors.array(),
+      });
+    }
+
+    const { name, mobile } = req.body;
+    const data = {
+      name,
+      mobile,
+    };
+
+    if (req.file !== undefined) {
+      data.image = "image/" + req.file.filename;
+    }
+
+    const userData = await User.findByIdAndUpdate(
+      { _id: req.user._id },
+      {
+        $set: data,
+      },
+      { new: true },
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Profile updated successfully",
+      user: userData,
+    });
+  } catch (e) {
+    return res.status(400).json({
+      success: false,
+      message: e.message,
+    });
+  }
+};
+
 module.exports = {
   userRegister,
   mailVerification,
@@ -379,4 +421,5 @@ module.exports = {
   resetSuccess,
   loginUser,
   userProfile,
+  updateProfile,
 };
