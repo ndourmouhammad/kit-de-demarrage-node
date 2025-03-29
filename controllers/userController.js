@@ -279,7 +279,14 @@ const resetSuccess = async (req, res) => {
 
 const generateAccessToken = async (user) => {
   const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
-    expiresIn: "24h",
+    expiresIn: "2h",
+  });
+  return token;
+};
+
+const generateRefreshToken = async (user) => {
+  const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+    expiresIn: "4h",
   });
   return token;
 };
@@ -326,6 +333,7 @@ const loginUser = async (req, res) => {
 
     // Générer le token JWT
     const accessToken = await generateAccessToken({ userId: userData._id });
+    const refreshToken = await generateRefreshToken({ userId: userData._id });
 
     return res.status(200).json({
       success: true,
@@ -336,6 +344,7 @@ const loginUser = async (req, res) => {
         email: userData.email,
       },
       accessToken,
+      refreshToken,
       tokenType: "Bearer",
     });
   } catch (error) {
@@ -421,6 +430,29 @@ const updateProfile = async (req, res) => {
   }
 };
 
+const refreshToken = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    const userData = await User.findOne({ _id: userId });
+
+    const accessToken = await generateAccessToken({ user: userData });
+    const refreshToken = await generateRefreshToken({ user: userData });
+
+    return res.status(200).json({
+      success: true,
+      message: "Token refreshed",
+      accessToken: accessToken,
+      refreshToken: refreshToken,
+    });
+  } catch (e) {
+    return res.status(400).json({
+      success: false,
+      message: e.message,
+    });
+  }
+};
+
 module.exports = {
   userRegister,
   mailVerification,
@@ -432,4 +464,5 @@ module.exports = {
   loginUser,
   userProfile,
   updateProfile,
+  refreshToken,
 };

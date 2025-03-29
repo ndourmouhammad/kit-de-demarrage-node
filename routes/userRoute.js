@@ -81,5 +81,6 @@ router.post(
   updateProfileValidator,
   userController.updateProfile,
 );
+router.get("/refresh-token", auth, userController.refreshToken);
 
 module.exports = router;
