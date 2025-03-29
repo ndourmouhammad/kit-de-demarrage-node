@@ -1,4 +1,5 @@
 const jwt = require("jsonwebtoken");
+const User = require("../models/userModel"); // Import du modèle utilisateur
 const config = process.env;
 
 const verifyToken = async (req, res, next) => {
@@ -17,9 +18,20 @@ const verifyToken = async (req, res, next) => {
     const bearerToken = bearer[1];
 
     const decodedData = jwt.verify(bearerToken, config.ACCESS_TOKEN_SECRET);
-    req.user = decodedData;
+
+    // 🔥 Récupération des infos complètes de l'utilisateur
+    const user = await User.findById(decodedData.userId).select("-password");
+
+    if (!user) {
+      return res.status(404).send({
+        success: false,
+        msg: "User not found",
+      });
+    }
+
+    req.user = user; // On attache l'utilisateur complet à la requête
   } catch (e) {
-    return res.status(403).send({
+    return res.status(401).send({
       success: false,
       msg: "Invalid token",
     });

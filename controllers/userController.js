@@ -345,6 +345,30 @@ const loginUser = async (req, res) => {
   }
 };
 
+const userProfile = async (req, res) => {
+  try {
+    const userData = req.user;
+
+    if (!userData) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "User profile data",
+      data: userData,
+    });
+  } catch (e) {
+    return res.status(400).json({
+      success: false,
+      message: e.message,
+    });
+  }
+};
+
 module.exports = {
   userRegister,
   mailVerification,
@@ -354,4 +378,5 @@ module.exports = {
   updatePassword,
   resetSuccess,
   loginUser,
+  userProfile,
 };

@@ -48,6 +48,7 @@ const {
   passwordResetValidator,
   loginValidator,
 } = require("../helpers/validation");
+const auth = require("../middleware/auth");
 
 router.post(
   "/register",
@@ -69,5 +70,8 @@ router.post(
 );
 
 router.post("/login", loginValidator, userController.loginUser);
+
+// authenticated routes
+router.get("/profile", auth, userController.userProfile);
 
 module.exports = router;
