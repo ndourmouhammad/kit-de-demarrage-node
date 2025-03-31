@@ -1,5 +1,6 @@
 const User = require("../models/userModel");
 const Blacklist = require("../models/blacklist");
+const Otp = require("../models/otp");
 const bcrypt = require("bcrypt");
 const { validationResult } = require("express-validator");
 const mailer = require("../helpers/mailer");
@@ -8,6 +9,10 @@ const PasswordReset = require("../models/passwordReset");
 const jwt = require("jsonwebtoken");
 const path = require("path");
 const { deleteFile } = require("../helpers/deleteFile");
+const {
+  oneMinuteExpiry,
+  threeMinuteExpiry,
+} = require("../helpers/otpValidate");
 
 const userRegister = async (req, res) => {
   try {
@@ -481,6 +486,144 @@ const logoutUser = async (req, res) => {
   }
 };
 
+const generateRandom4Digit = async () => {
+  return Math.floor(1000 + Math.random() * 9000);
+};
+
+const sendOtp = async (req, res) => {
+  try {
+    const errors = validationResult(req);
+
+    if (!errors.isEmpty()) {
+      return res.status(400).send({
+        errors: errors.array(),
+        success: false,
+        message: "Errors",
+      });
+    }
+
+    const { email } = req.body;
+
+    const userData = await User.findOne({ email });
+    if (!userData) {
+      return res.status(400).send({
+        success: false,
+        message: "Email does not exist",
+      });
+    }
+
+    if (userData.is_verified == 1) {
+      return res.status(400).send({
+        success: false,
+        message: userData.email + " mail is already verified",
+      });
+    }
+
+    const g_otp = await generateRandom4Digit();
+
+    const oldOtpData = await Otp.findOne({ user_id: userData._id });
+
+    if (oldOtpData) {
+      const sendNextOtp = await oneMinuteExpiry(oldOtpData.timestamp);
+      if (!sendNextOtp) {
+        return res.status(400).send({
+          success: false,
+          message: "Please try after some time!",
+        });
+      }
+    }
+
+    const cDate = new Date();
+
+    await Otp.findOneAndUpdate(
+      { user_id: userData._id },
+      { otp: g_otp, timestamp: new Date(cDate.getTime()) },
+      { upsert: true, new: true, setDefaultsOnInsert: true },
+    );
+
+    /*
+    const enter_otp = Otp({
+      user_id: userData._id,
+      otp: g_otp,
+    });
+
+    await enter_otp.save();
+    */
+
+    const msg = `<p>Dear <b>${userData.name}</b>,</p> 
+    <h4>${g_otp}</h4>
+    <p>If you did not create an account with us, please ignore this email.</p>
+    <p>Best regards,</p>
+    <p>Mouhammad Ndour</p>`;
+
+    mailer.sendMail(userData.email, "Otp verification", msg);
+
+    return res.status(200).json({
+      status: "success",
+      message: "Otp has been sent to your mail, please check!",
+    });
+  } catch (e) {
+    return res.status(400).json({
+      success: false,
+      message: e.message,
+    });
+  }
+};
+
+const verifyOtp = async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).send({
+        success: false,
+        message: "Errors",
+        errors: errors.array(),
+      });
+    }
+
+    const { user_id, otp } = req.body;
+
+    const optData = await Otp.findOne({
+      user_id,
+      otp,
+    });
+
+    if (!optData) {
+      return res.status(400).send({
+        success: false,
+        message: "You entered wrong OTP!",
+      });
+    }
+
+    const isOtpExpired = await threeMinuteExpiry(optData.timestamp);
+    if (!isOtpExpired) {
+      return res.status(400).send({
+        success: false,
+        message: "Otp has expired",
+      });
+    }
+
+    await User.findByIdAndUpdate(
+      { _id: user_id },
+      {
+        $set: {
+          is_verified: 1,
+        },
+      },
+    );
+
+    return res.status(200).json({
+      status: "success",
+      message: "Account verification successfully",
+    });
+  } catch (e) {
+    return res.status(400).send({
+      success: false,
+      message: e.message,
+    });
+  }
+};
+
 module.exports = {
   userRegister,
   mailVerification,
@@ -494,4 +637,6 @@ module.exports = {
   updateProfile,
   refreshToken,
   logoutUser,
+  sendOtp,
+  verifyOtp,
 };

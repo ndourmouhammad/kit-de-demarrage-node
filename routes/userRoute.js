@@ -48,8 +48,11 @@ const {
   passwordResetValidator,
   loginValidator,
   updateProfileValidator,
+  otpMailValidator,
+  verifyOtpValidator,
 } = require("../helpers/validation");
 const auth = require("../middleware/auth");
+const { sendMailVerification } = require("../controllers/userController");
 
 router.post(
   "/register",
@@ -83,5 +86,9 @@ router.post(
 );
 router.get("/refresh-token", auth, userController.refreshToken);
 router.get("/logout", auth, userController.logoutUser);
+
+// opt verification routes
+router.post("/send-otp", otpMailValidator, userController.sendOtp);
+router.post("/verify-otp", verifyOtpValidator, userController.verifyOtp);
 
 module.exports = router;
