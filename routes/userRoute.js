@@ -82,5 +82,6 @@ router.post(
   userController.updateProfile,
 );
 router.get("/refresh-token", auth, userController.refreshToken);
+router.get("/logout", auth, userController.logoutUser);
 
 module.exports = router;

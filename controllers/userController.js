@@ -1,4 +1,5 @@
 const User = require("../models/userModel");
+const Blacklist = require("../models/blacklist");
 const bcrypt = require("bcrypt");
 const { validationResult } = require("express-validator");
 const mailer = require("../helpers/mailer");
@@ -453,6 +454,33 @@ const refreshToken = async (req, res) => {
   }
 };
 
+const logoutUser = async (req, res) => {
+  try {
+    const token =
+      req.body.token || req.query.token || req.headers["authorization"];
+
+    const bearer = token.split(" ");
+    const bearerToken = bearer[1];
+
+    const newBlacklist = new Blacklist({
+      token: bearerToken,
+    });
+
+    await newBlacklist.save();
+
+    res.setHeader("Clesr-Site-Data", '"cookies", "storage"');
+    return res.status(200).json({
+      success: true,
+      message: "Logged out successfully",
+    });
+  } catch (e) {
+    return res.status(400).json({
+      success: false,
+      message: e.message,
+    });
+  }
+};
+
 module.exports = {
   userRegister,
   mailVerification,
@@ -465,4 +493,5 @@ module.exports = {
   userProfile,
   updateProfile,
   refreshToken,
+  logoutUser,
 };

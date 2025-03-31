@@ -1,5 +1,6 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/userModel"); // Import du modèle utilisateur
+const Blacklist = require("../models/blacklist");
 const config = process.env;
 
 const verifyToken = async (req, res, next) => {
@@ -16,6 +17,15 @@ const verifyToken = async (req, res, next) => {
   try {
     const bearer = token.split(" ");
     const bearerToken = bearer[1];
+
+    const blacklistedToken = await Blacklist.findOne({ token: bearerToken });
+
+    if (blacklistedToken) {
+      return res.status(400).send({
+        success: false,
+        msg: "This session has expired, please try again",
+      });
+    }
 
     const decodedData = jwt.verify(bearerToken, config.ACCESS_TOKEN_SECRET);
 
